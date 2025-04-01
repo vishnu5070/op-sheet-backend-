@@ -1,6 +1,12 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
+import logging
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
 # Simple database to assign doctors based on symptoms
 doctors = {
@@ -30,6 +36,9 @@ def submit_patient():
 
     if not name or not age or not symptoms:
         return jsonify({"error": "Missing required fields"}), 400
+
+    # Log the received data
+    logging.info("Received patient data: Name: %s, Age: %s, Symptoms: %s", name, age, symptoms)
 
     # Assign doctor based on symptoms
     doctor = doctors.get(symptoms, "Dr. Johnson (General Practitioner)")  # Default if no match
