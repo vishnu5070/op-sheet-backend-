@@ -1,57 +1,63 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import logging
+from flask import Flask, render_template, request, jsonify
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from datetime import datetime
+import os
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Create a directory for PDFs if it doesn’t exist
+if not os.path.exists("OP_Sheets"):
+    os.makedirs("OP_Sheets")
 
-# Simple database to assign doctors based on symptoms
-doctors = {
-    "fever": "Dr. Smith (General Physician)",
-    "chest pain": "Dr. Adams (Cardiologist)",
-    "headache": "Dr. Brown (Neurologist)"
+# Disease-Doctor Mapping
+disease_data = {
+    "Fever": ("Dr. Rajesh Kumar", 101, "General Medicine"),
+    "Diabetes": ("Dr. Sneha Sharma", 102, "Endocrinology"),
+    "Heart Disease": ("Dr. Anil Mehta", 103, "Cardiology"),
+    "Dermatology": ("Dr. Rina Das", 104, "Dermatology"),
+    "General": ("Dr. Sandeep Rao", 105, "General Medicine")
 }
 
-rooms = {
-    "Dr. Smith (General Physician)": 101,
-    "Dr. Adams (Cardiologist)": 102,
-    "Dr. Brown (Neurologist)": 103
-}
+# Route to render HTML page
+@app.route("/")
+def home():
+    return render_template("index.html")
 
-@app.route('/submit_patient', methods=['POST'])
-def submit_patient():
-    # Check if the request contains JSON data
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
-
+# Route to generate OP Sheet
+@app.route("/generate_op", methods=["POST"])
+def generate_op():
     data = request.json
+    name, age, symptom = data["name"], data["age"], data["symptom"]
+    
+    if not name or not age or not symptom:
+        return jsonify({"message": "All fields are required!"}), 400
 
-    # Validate required fields
-    name = data.get('name')
-    age = data.get('age')
-    symptoms = data.get('symptoms', '').lower()
+    doctor, room, department = disease_data.get(symptom, ("Dr. Sandeep Rao", 105, "General Medicine"))
+    filename = f"OP_Sheets/OP_Sheet_{name.replace(' ', '_')}.pdf"
 
-    if not name or not age or not symptoms:
-        return jsonify({"error": "Missing required fields"}), 400
+    # Generate PDF
+    c = canvas.Canvas(filename, pagesize=A4)
+    width, height = A4
 
-    # Log the received data
-    logging.info("Received patient data: Name: %s, Age: %s, Symptoms: %s", name, age, symptoms)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(200, height - 50, "Hospital OP Sheet")
+    
+    c.setFont("Helvetica", 12)
+    c.drawString(50, height - 90, f"Name: {name}")
+    c.drawString(300, height - 90, f"Age: {age}")
+    c.drawString(450, height - 90, f"Symptom: {symptom}")
 
-    # Assign doctor based on symptoms
-    doctor = doctors.get(symptoms, "Dr. Johnson (General Practitioner)")  # Default if no match
-    room = rooms.get(doctor, 100)  # Default room number if no match
+    c.drawString(50, height - 120, f"Doctor Name: {doctor}")
+    c.drawString(300, height - 120, f"Room No: {room}")
+    c.drawString(450, height - 120, f"Dept: {department}")
 
-    # Estimated wait time (dummy value for now)
-    wait_time = "15-20 minutes"
+    c.drawString(50, height - 150, f"Date & Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    c.drawString(50, 50, "Doctor Signature: ___________________")
+    c.save()
 
-    return jsonify({
-        'doctor': doctor,
-        'room': room,
-        'wait_time': wait_time
-    })
+    return jsonify({"message": f"OP Sheet generated successfully: {filename}"}), 200
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
